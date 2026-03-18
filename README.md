@@ -2,6 +2,14 @@
 
 An AI-powered coding mentor that helps developers master Data Structures & Algorithms — not by giving answers, but by guiding you to find them yourself.
 
+## 🚀 Live Demo
+
+| | Link |
+|-|------|
+| 🌐 **Frontend** | [algomentor-ai.vercel.app](https://algomentor-ai.vercel.app) |
+| ⚙️ **Backend API** | [algomentor-ai.onrender.com](https://algomentor-ai.onrender.com) |
+| 📖 **Swagger Docs** | [algomentor-ai.onrender.com/docs](https://algomentor-ai.onrender.com/docs) |
+
 ## What is this?
 
 Most DSA learners hit a wall, give up, and look at the solution — learning nothing. AlgoMentor fixes that by putting a Mistral AI assistant right beside every coding problem. It nudges you in the right direction without spoiling the answer.
