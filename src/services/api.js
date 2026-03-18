@@ -7,7 +7,7 @@
  * TODO (scalability): Wrap with React Query or SWR for caching,
  * deduplication, and automatic retries on the client side.
  */
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://algomentor-ai.onrender.com';
 
 // ─── Base fetch ───────────────────────────────────────────────────────────────
 async function request(path, options = {}) {
