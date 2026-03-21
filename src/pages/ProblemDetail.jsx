@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Play, Send, Lightbulb, Code2, MessageSquare, Sparkles, Building2, Bookmark, BookmarkCheck, StickyNote, Zap, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Play, Send, Lightbulb, Code2, MessageSquare, Sparkles, Building2, Bookmark, BookmarkCheck, StickyNote, Zap, CheckCircle2, Bot } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import CodeEditor from '../components/ui/CodeEditor';
@@ -109,6 +109,7 @@ export default function ProblemDetail() {
   const [submitted, setSubmitted] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [markedSolved, setMarkedSolved] = useState(false);
+  const [mobileView, setMobileView] = useState('problem');
 
   const problem = problems.find((p) => p.id === Number(id));
 
@@ -253,10 +254,36 @@ export default function ProblemDetail() {
         </div>
       </div>
 
+      {/* Mobile view toggle */}
+      <div className="flex lg:hidden border-b border-slate-200 bg-white">
+        <button
+          onClick={() => setMobileView('problem')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+            mobileView === 'problem'
+              ? 'border-indigo-500 text-indigo-600 bg-indigo-50/40'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <Code2 size={13} /> Problem
+        </button>
+        <button
+          onClick={() => setMobileView('code')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+            mobileView === 'code'
+              ? 'border-indigo-500 text-indigo-600 bg-indigo-50/40'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <Play size={13} /> Editor
+        </button>
+      </div>
+
       {/* Main Split Layout */}
       <div className="flex flex-1 overflow-hidden divide-x divide-slate-100">
         {/* Left: Problem Description */}
-        <div className="w-full lg:w-[45%] flex flex-col overflow-hidden">
+        <div className={`${
+          mobileView === 'code' ? 'hidden' : 'flex'
+        } lg:flex w-full lg:w-[45%] flex-col overflow-hidden`}>
           {/* Tabs */}
           <div className="flex border-b border-slate-100 bg-white px-4">
             {TABS.map((tab) => (
@@ -331,7 +358,9 @@ export default function ProblemDetail() {
         </div>
 
         {/* Right: Code Editor */}
-        <div className="hidden lg:flex flex-col flex-1 overflow-hidden bg-slate-50">
+        <div className={`${
+          mobileView === 'problem' ? 'hidden' : 'flex'
+        } lg:flex flex-col flex-1 overflow-hidden bg-slate-50`}>
           {/* Code Editor */}
           <div className="flex-1 p-3 overflow-hidden">
             <CodeEditor
