@@ -7,6 +7,731 @@ export const LANGUAGES = [
   { id: 'go', label: 'Go', ext: 'go', monoIcon: 'GO' },
 ];
 
+// ─── Algorithm Patterns ───────────────────────────────────────────────────────
+export const algorithmPatterns = [
+  {
+    id: 'sliding-window',
+    name: 'Sliding Window',
+    emoji: '🪟',
+    category: 'Array / String',
+    difficulty: 'Medium',
+    description: 'Maintain a window over a contiguous sequence and slide it to efficiently solve subarray/substring problems.',
+    whenToUse: [
+      'Find max/min subarray of size k',
+      '"Longest / shortest substring with condition X"',
+      'Problems involving contiguous elements',
+      'Avoid nested loops on sequences',
+    ],
+    timeComplexity: 'O(n)',
+    spaceComplexity: 'O(1) or O(k)',
+    template: {
+      javascript: `function slidingWindow(arr, k) {
+  let left = 0;
+  let result = 0;
+  let windowState = 0; // e.g. sum, char count, etc.
+
+  for (let right = 0; right < arr.length; right++) {
+    // 1. Expand: add arr[right] to window
+    windowState += arr[right];
+
+    // 2. Shrink: while constraint violated, move left
+    while (windowState > k) {
+      windowState -= arr[left];
+      left++;
+    }
+
+    // 3. Update result
+    result = Math.max(result, right - left + 1);
+  }
+
+  return result;
+}`,
+      python: `def sliding_window(arr, k):
+    left = 0
+    result = 0
+    window_state = 0  # e.g. sum, char count, etc.
+
+    for right in range(len(arr)):
+        # 1. Expand
+        window_state += arr[right]
+
+        # 2. Shrink while constraint violated
+        while window_state > k:
+            window_state -= arr[left]
+            left += 1
+
+        # 3. Update result
+        result = max(result, right - left + 1)
+
+    return result`,
+    },
+    relatedProblems: ['Longest Substring Without Repeating Characters', 'Container With Most Water', 'Best Time to Buy and Sell Stock'],
+    tips: [
+      'Variable window: shrink from left when constraint violated',
+      'Fixed window of size k: subtract arr[right - k] each step',
+      'Use a HashMap inside the window to track frequencies',
+    ],
+  },
+  {
+    id: 'two-pointers',
+    name: 'Two Pointers',
+    emoji: '👆',
+    category: 'Array / String',
+    difficulty: 'Medium',
+    description: 'Use two indices moving toward each other (or at different speeds) to solve problems in O(n) instead of O(n²).',
+    whenToUse: [
+      'Sorted array pair problems',
+      'Finding triplets/pairs that sum to target',
+      'Palindrome checks',
+      'Linked list cycle detection (fast/slow)',
+    ],
+    timeComplexity: 'O(n)',
+    spaceComplexity: 'O(1)',
+    template: {
+      javascript: `function twoPointers(arr, target) {
+  // Array must be sorted (or sort first)
+  let left = 0;
+  let right = arr.length - 1;
+
+  while (left < right) {
+    const sum = arr[left] + arr[right];
+
+    if (sum === target) {
+      return [left, right]; // Found
+    } else if (sum < target) {
+      left++;  // Need larger sum
+    } else {
+      right--; // Need smaller sum
+    }
+  }
+
+  return [-1, -1]; // Not found
+}`,
+      python: `def two_pointers(arr, target):
+    left, right = 0, len(arr) - 1
+
+    while left < right:
+        total = arr[left] + arr[right]
+
+        if total == target:
+            return [left, right]
+        elif total < target:
+            left += 1
+        else:
+            right -= 1
+
+    return [-1, -1]`,
+    },
+    relatedProblems: ['3Sum', 'Container With Most Water', 'Trapping Rain Water'],
+    tips: [
+      'Opposite ends → converging (pair sum, partition)',
+      'Same start → fast/slow (Floyd cycle detection)',
+      'Sort first if order doesn\'t matter and it enables two-pointer',
+    ],
+  },
+  {
+    id: 'binary-search',
+    name: 'Binary Search',
+    emoji: '🔍',
+    category: 'Array',
+    difficulty: 'Medium',
+    description: 'Halve the search space each iteration by comparing against the midpoint. Works on any monotonically changing condition.',
+    whenToUse: [
+      'Sorted array search',
+      '"Find minimum X such that condition(X) is true"',
+      'Rotated sorted array',
+      'Search a value range (e.g. Koko eating bananas)',
+    ],
+    timeComplexity: 'O(log n)',
+    spaceComplexity: 'O(1)',
+    template: {
+      javascript: `function binarySearch(arr, target) {
+  let left = 0;
+  let right = arr.length - 1;
+
+  while (left <= right) {
+    const mid = left + Math.floor((right - left) / 2); // Avoid overflow
+
+    if (arr[mid] === target) {
+      return mid;
+    } else if (arr[mid] < target) {
+      left = mid + 1; // Search right half
+    } else {
+      right = mid - 1; // Search left half
+    }
+  }
+
+  return -1; // Not found
+}
+
+// Template for: find leftmost position where condition is true
+function binarySearchBoundary(lo, hi, condition) {
+  while (lo < hi) {
+    const mid = lo + Math.floor((hi - lo) / 2);
+    if (condition(mid)) {
+      hi = mid; // Move left boundary
+    } else {
+      lo = mid + 1; // Move right boundary
+    }
+  }
+  return lo;
+}`,
+      python: `def binary_search(arr, target):
+    left, right = 0, len(arr) - 1
+
+    while left <= right:
+        mid = (left + right) // 2
+
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+
+    return -1
+
+# Find leftmost position where condition is true
+def binary_search_boundary(lo, hi, condition):
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if condition(mid):
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo`,
+    },
+    relatedProblems: ['Find Minimum in Rotated Sorted Array', 'Median of Two Sorted Arrays'],
+    tips: [
+      'Use mid = left + (right - left) / 2 to avoid integer overflow',
+      'left <= right for exact search; left < right for boundary search',
+      'Binary search works on any monotonic predicate, not just arrays',
+    ],
+  },
+  {
+    id: 'bfs',
+    name: 'BFS (Breadth-First Search)',
+    emoji: '🌊',
+    category: 'Graph / Tree',
+    difficulty: 'Medium',
+    description: 'Explore all neighbors at the current depth before moving deeper. Guarantees shortest path in unweighted graphs.',
+    whenToUse: [
+      'Shortest path in unweighted graph',
+      'Level-order tree traversal',
+      'Find nearest node satisfying a condition',
+      'Multi-source BFS (multiple starting points)',
+    ],
+    timeComplexity: 'O(V + E)',
+    spaceComplexity: 'O(V)',
+    template: {
+      javascript: `function bfs(graph, start) {
+  const visited = new Set([start]);
+  const queue = [start];
+  const result = [];
+
+  while (queue.length > 0) {
+    const node = queue.shift(); // Dequeue front
+    result.push(node);
+
+    for (const neighbor of graph[node] || []) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  return result;
+}
+
+// BFS for shortest path
+function shortestPath(graph, start, end) {
+  const visited = new Set([start]);
+  const queue = [[start, 0]]; // [node, distance]
+
+  while (queue.length > 0) {
+    const [node, dist] = queue.shift();
+    if (node === end) return dist;
+
+    for (const neighbor of graph[node] || []) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push([neighbor, dist + 1]);
+      }
+    }
+  }
+  return -1; // Not reachable
+}`,
+      python: `from collections import deque
+
+def bfs(graph, start):
+    visited = {start}
+    queue = deque([start])
+    result = []
+
+    while queue:
+        node = queue.popleft()
+        result.append(node)
+
+        for neighbor in graph.get(node, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+
+    return result
+
+def shortest_path(graph, start, end):
+    visited = {start}
+    queue = deque([(start, 0)])  # (node, distance)
+
+    while queue:
+        node, dist = queue.popleft()
+        if node == end:
+            return dist
+        for neighbor in graph.get(node, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append((neighbor, dist + 1))
+
+    return -1`,
+    },
+    relatedProblems: ['Binary Tree Level Order Traversal', 'Number of Islands', 'Word Ladder', 'Course Schedule'],
+    tips: [
+      'Always mark visited BEFORE enqueuing to avoid re-processing',
+      'Use deque (double-ended queue) — O(1) popleft vs O(n) list.pop(0)',
+      'For grid BFS: directions = [(-1,0),(1,0),(0,-1),(0,1)]',
+    ],
+  },
+  {
+    id: 'dfs',
+    name: 'DFS (Depth-First Search)',
+    emoji: '🌲',
+    category: 'Graph / Tree',
+    difficulty: 'Medium',
+    description: 'Explore each branch fully before backtracking. Used for connectivity, cycles, and tree problems.',
+    whenToUse: [
+      'Connected components / islands',
+      'Cycle detection in a graph',
+      'Topological sort (via post-order)',
+      'Tree path problems (root-to-leaf)',
+      'Backtracking (explore all possibilities)',
+    ],
+    timeComplexity: 'O(V + E)',
+    spaceComplexity: 'O(V) recursion stack',
+    template: {
+      javascript: `// Recursive DFS
+function dfsRecursive(graph, node, visited = new Set()) {
+  visited.add(node);
+
+  for (const neighbor of graph[node] || []) {
+    if (!visited.has(neighbor)) {
+      dfsRecursive(graph, neighbor, visited);
+    }
+  }
+}
+
+// Iterative DFS (avoids stack overflow for deep graphs)
+function dfsIterative(graph, start) {
+  const visited = new Set();
+  const stack = [start];
+
+  while (stack.length > 0) {
+    const node = stack.pop(); // Take from top
+    if (visited.has(node)) continue;
+    visited.add(node);
+
+    for (const neighbor of graph[node] || []) {
+      if (!visited.has(neighbor)) {
+        stack.push(neighbor);
+      }
+    }
+  }
+}`,
+      python: `# Recursive DFS
+def dfs_recursive(graph, node, visited=None):
+    if visited is None:
+        visited = set()
+    visited.add(node)
+
+    for neighbor in graph.get(node, []):
+        if neighbor not in visited:
+            dfs_recursive(graph, neighbor, visited)
+
+# Iterative DFS
+def dfs_iterative(graph, start):
+    visited = set()
+    stack = [start]
+
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+
+        for neighbor in graph.get(node, []):
+            if neighbor not in visited:
+                stack.append(neighbor)`,
+    },
+    relatedProblems: ['Number of Islands', 'Course Schedule', 'N-Queens', 'Serialize and Deserialize Binary Tree'],
+    tips: [
+      'Recursive DFS is cleaner but risks stack overflow on very deep graphs',
+      'For trees: pre-order (root first) vs post-order (children first)',
+      'Track state as "visiting" (gray) and "visited" (black) for cycle detection',
+    ],
+  },
+  {
+    id: 'dp-1d',
+    name: 'Dynamic Programming (1D)',
+    emoji: '🧠',
+    category: 'DP',
+    difficulty: 'Hard',
+    description: 'Break a problem into overlapping subproblems. Store results to avoid recomputation (memoization or tabulation).',
+    whenToUse: [
+      'Optimal substructure: optimal solution built from subproblems',
+      'Overlapping subproblems: same sub-cases repeat',
+      '"Max/min/count ways" problems',
+      'Fibonacci-like recurrences',
+    ],
+    timeComplexity: 'O(n)',
+    spaceComplexity: 'O(n) or O(1) with space optimization',
+    template: {
+      javascript: `// Top-down (Memoization)
+function dpMemo(n, memo = new Map()) {
+  if (n <= 1) return n; // Base case
+  if (memo.has(n)) return memo.get(n);
+
+  const result = dpMemo(n - 1, memo) + dpMemo(n - 2, memo);
+  memo.set(n, result);
+  return result;
+}
+
+// Bottom-up (Tabulation)
+function dpTabulation(n) {
+  if (n <= 1) return n;
+
+  const dp = new Array(n + 1).fill(0);
+  dp[0] = 0;
+  dp[1] = 1;
+
+  for (let i = 2; i <= n; i++) {
+    dp[i] = dp[i - 1] + dp[i - 2]; // Recurrence relation
+  }
+  return dp[n];
+}
+
+// Space-optimized (when only last k states matter)
+function dpSpaceOptimized(n) {
+  let prev2 = 0, prev1 = 1;
+  for (let i = 2; i <= n; i++) {
+    const curr = prev1 + prev2;
+    prev2 = prev1;
+    prev1 = curr;
+  }
+  return prev1;
+}`,
+      python: `from functools import lru_cache
+
+# Top-down (Memoization with decorator)
+@lru_cache(maxsize=None)
+def dp_memo(n):
+    if n <= 1:
+        return n
+    return dp_memo(n - 1) + dp_memo(n - 2)
+
+# Bottom-up (Tabulation)
+def dp_tabulation(n):
+    if n <= 1:
+        return n
+    dp = [0] * (n + 1)
+    dp[1] = 1
+    for i in range(2, n + 1):
+        dp[i] = dp[i - 1] + dp[i - 2]
+    return dp[n]
+
+# Space-optimized
+def dp_space_optimized(n):
+    prev2, prev1 = 0, 1
+    for _ in range(2, n + 1):
+        prev2, prev1 = prev1, prev1 + prev2
+    return prev1`,
+    },
+    relatedProblems: ['Climbing Stairs', 'Coin Change', 'Maximum Subarray', 'Longest Palindromic Substring'],
+    tips: [
+      'Start by defining dp[i] clearly: "dp[i] = X for input of size i"',
+      'Find the recurrence relation before writing any code',
+      'Memoization = recursion + cache; Tabulation = iterative + array',
+      'Optimize space by keeping only the last k states if possible',
+    ],
+  },
+  {
+    id: 'backtracking',
+    name: 'Backtracking',
+    emoji: '🔙',
+    category: 'Recursion',
+    difficulty: 'Hard',
+    description: 'Build solutions incrementally and abandon ("backtrack") branches that violate constraints.',
+    whenToUse: [
+      'Generate all permutations / combinations / subsets',
+      'Constraint satisfaction: N-Queens, Sudoku',
+      'Path finding with restrictions',
+      '"Find all solutions" type problems',
+    ],
+    timeComplexity: 'O(n! or 2^n) — exponential by nature',
+    spaceComplexity: 'O(n) recursion depth',
+    template: {
+      javascript: `function backtrack(result, current, choices, start = 0) {
+  // 1. Base case: valid solution found
+  if (isComplete(current)) {
+    result.push([...current]); // Copy, don't reference
+    return;
+  }
+
+  for (let i = start; i < choices.length; i++) {
+    const choice = choices[i];
+
+    // 2. Prune: skip invalid choices early
+    if (!isValid(current, choice)) continue;
+
+    // 3. Make choice
+    current.push(choice);
+
+    // 4. Recurse
+    backtrack(result, current, choices, i + 1); // i+1 for combinations; i for repetition
+
+    // 5. Undo choice (backtrack)
+    current.pop();
+  }
+}`,
+      python: `def backtrack(result, current, choices, start=0):
+    # 1. Base case
+    if is_complete(current):
+        result.append(current[:])  # Copy
+        return
+
+    for i in range(start, len(choices)):
+        choice = choices[i]
+
+        # 2. Prune invalid branches
+        if not is_valid(current, choice):
+            continue
+
+        # 3. Make choice
+        current.append(choice)
+
+        # 4. Recurse
+        backtrack(result, current, choices, i + 1)
+
+        # 5. Undo (backtrack)
+        current.pop()`,
+    },
+    relatedProblems: ['N-Queens', 'Permutations', 'Subsets', 'Word Search'],
+    tips: [
+      'Always make a copy when adding to results (not a reference)',
+      'Pruning is the key to efficiency — eliminate invalid branches early',
+      'Use a "used" boolean array or a Set for permutations (no reuse)',
+      'Sort input first to easily skip duplicates',
+    ],
+  },
+  {
+    id: 'monotonic-stack',
+    name: 'Monotonic Stack',
+    emoji: '📚',
+    category: 'Stack',
+    difficulty: 'Medium',
+    description: 'A stack that maintains elements in sorted order. Pop elements that violate the ordering — the popped element found its "answer".',
+    whenToUse: [
+      'Next Greater / Smaller Element problems',
+      'Daily Temperatures style problems',
+      'Largest rectangle in histogram',
+      'Trapping rain water (stack approach)',
+    ],
+    timeComplexity: 'O(n) — each element pushed/popped at most once',
+    spaceComplexity: 'O(n)',
+    template: {
+      javascript: `// Next Greater Element (monotonic decreasing stack)
+function nextGreaterElement(arr) {
+  const n = arr.length;
+  const result = new Array(n).fill(-1);
+  const stack = []; // Stores indices
+
+  for (let i = 0; i < n; i++) {
+    // Pop elements that found their "next greater"
+    while (stack.length > 0 && arr[stack[stack.length - 1]] < arr[i]) {
+      const idx = stack.pop();
+      result[idx] = arr[i]; // arr[i] is the next greater for arr[idx]
+    }
+    stack.push(i);
+  }
+
+  return result; // Remaining indices in stack have no next greater
+}`,
+      python: `def next_greater_element(arr):
+    n = len(arr)
+    result = [-1] * n
+    stack = []  # Stores indices
+
+    for i in range(n):
+        while stack and arr[stack[-1]] < arr[i]:
+            idx = stack.pop()
+            result[idx] = arr[i]
+        stack.append(i)
+
+    return result`,
+    },
+    relatedProblems: ['Trapping Rain Water', 'Container With Most Water'],
+    tips: [
+      'Decreasing stack → finds next GREATER element when popping',
+      'Increasing stack → finds next SMALLER element when popping',
+      'Process from left-to-right for "next" problems, right-to-left for "previous"',
+    ],
+  },
+  {
+    id: 'prefix-sum',
+    name: 'Prefix Sum',
+    emoji: '➕',
+    category: 'Array',
+    difficulty: 'Easy',
+    description: 'Precompute cumulative sums so any subarray sum can be computed in O(1).',
+    whenToUse: [
+      'Subarray sum queries',
+      '"How many subarrays sum to k?"',
+      '2D matrix range sum queries',
+      'Remove the need for nested loops on sums',
+    ],
+    timeComplexity: 'O(n) build, O(1) query',
+    spaceComplexity: 'O(n)',
+    template: {
+      javascript: `// Build prefix sum array
+function buildPrefix(arr) {
+  const prefix = new Array(arr.length + 1).fill(0);
+  for (let i = 0; i < arr.length; i++) {
+    prefix[i + 1] = prefix[i] + arr[i];
+  }
+  return prefix;
+}
+
+// Query: sum of arr[left..right] inclusive
+function rangeSum(prefix, left, right) {
+  return prefix[right + 1] - prefix[left];
+}
+
+// Count subarrays with sum = k (using HashMap)
+function subarraySum(nums, k) {
+  const map = new Map([[0, 1]]); // prefix sum → count
+  let sum = 0, count = 0;
+
+  for (const num of nums) {
+    sum += num;
+    count += (map.get(sum - k) || 0);
+    map.set(sum, (map.get(sum) || 0) + 1);
+  }
+
+  return count;
+}`,
+      python: `def build_prefix(arr):
+    prefix = [0] * (len(arr) + 1)
+    for i, val in enumerate(arr):
+        prefix[i + 1] = prefix[i] + val
+    return prefix
+
+def range_sum(prefix, left, right):
+    return prefix[right + 1] - prefix[left]
+
+def subarray_sum(nums, k):
+    from collections import defaultdict
+    count_map = defaultdict(int, {0: 1})
+    total = 0
+    count = 0
+    for num in nums:
+        total += num
+        count += count_map[total - k]
+        count_map[total] += 1
+    return count`,
+    },
+    relatedProblems: ['Maximum Subarray', 'Product of Array Except Self'],
+    tips: [
+      'Use prefix[0] = 0 sentinel to simplify edge cases',
+      'sum(left, right) = prefix[right+1] - prefix[left]',
+      'Combine with HashMap to find subarrays with sum = k in O(n)',
+    ],
+  },
+  {
+    id: 'topological-sort',
+    name: 'Topological Sort',
+    emoji: '📋',
+    category: 'Graph',
+    difficulty: 'Hard',
+    description: "Order nodes in a DAG such that every directed edge u→v has u before v. Used for dependency resolution.",
+    whenToUse: [
+      'Course prerequisites / task scheduling',
+      'Build system ordering',
+      'Detect cycle in a directed graph',
+      'Any "must come before" ordering problem',
+    ],
+    timeComplexity: 'O(V + E)',
+    spaceComplexity: 'O(V)',
+    template: {
+      javascript: `// Kahn's Algorithm (BFS-based)
+function topoSort(numNodes, edges) {
+  const adj = Array.from({ length: numNodes }, () => []);
+  const inDegree = new Array(numNodes).fill(0);
+
+  for (const [u, v] of edges) {
+    adj[u].push(v);
+    inDegree[v]++;
+  }
+
+  // Start with all nodes that have no prerequisites
+  const queue = [];
+  for (let i = 0; i < numNodes; i++) {
+    if (inDegree[i] === 0) queue.push(i);
+  }
+
+  const order = [];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    order.push(node);
+
+    for (const neighbor of adj[node]) {
+      inDegree[neighbor]--;
+      if (inDegree[neighbor] === 0) queue.push(neighbor);
+    }
+  }
+
+  return order.length === numNodes ? order : []; // [] means cycle exists
+}`,
+      python: `from collections import deque
+
+def topo_sort(num_nodes, edges):
+    adj = [[] for _ in range(num_nodes)]
+    in_degree = [0] * num_nodes
+
+    for u, v in edges:
+        adj[u].append(v)
+        in_degree[v] += 1
+
+    queue = deque(i for i in range(num_nodes) if in_degree[i] == 0)
+    order = []
+
+    while queue:
+        node = queue.popleft()
+        order.append(node)
+        for neighbor in adj[node]:
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+
+    return order if len(order) == num_nodes else []  # [] = cycle`,
+    },
+    relatedProblems: ['Course Schedule', 'Course Schedule II'],
+    tips: [
+      'If order length < numNodes → cycle detected in the graph',
+      'DFS-based topo sort: add to result AFTER visiting all neighbors (post-order)',
+      'Kahn\'s (BFS) is more intuitive and easier to detect cycles',
+    ],
+  },
+];
+
 export const problems = [
   {
     id: 1,

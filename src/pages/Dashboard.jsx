@@ -1,11 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, Target, Flame, CheckCircle2, Clock, ChevronRight, Trophy } from 'lucide-react';
+import { ArrowRight, Sparkles, Target, Flame, CheckCircle2, Clock, ChevronRight, Trophy, CalendarCheck, RefreshCw, Star } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { SkeletonCard } from '../components/ui/Skeleton';
-import { stats, suggestedProblems, recentActivity } from '../data/dummy';
+import { stats, suggestedProblems, recentActivity, problems } from '../data/dummy';
+import { dailyStorage, reviewStorage } from '../utils/storage';
+
+// Pick a deterministic daily problem based on today's date
+function getDailyProblem() {
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000
+  );
+  return problems[dayOfYear % problems.length];
+}
+
+// Time remaining until midnight
+function getMidnightCountdown() {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const diff = Math.floor((midnight - now) / 1000);
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  return `${h}h ${m}m`;
+}
 
 function StatCard({ label, value, suffix = '', icon, color, sub }) {
   return (
@@ -27,16 +47,41 @@ function StatCard({ label, value, suffix = '', icon, color, sub }) {
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
+  const [dailyDone, setDailyDone] = useState(() => dailyStorage.hasCompletedToday());
+  const [countdown, setCountdown] = useState(getMidnightCountdown());
+
+  const dailyProblem = useMemo(() => getDailyProblem(), []);
+
+  const dueForReview = useMemo(() => {
+    const dueIds = reviewStorage.getDue();
+    return dueIds
+      .map((id) => problems.find((p) => p.id === id))
+      .filter(Boolean)
+      .slice(0, 3);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1200);
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    const tick = setInterval(() => setCountdown(getMidnightCountdown()), 60000);
+    return () => clearInterval(tick);
+  }, []);
+
+  const markDailyDone = () => {
+    dailyStorage.markCompleted(dailyProblem.id);
+    setDailyDone(true);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Welcome Header */}
       <div className="mb-8">
+        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </p>
         <h1 className="text-2xl font-bold text-slate-800">Ready to practice? 🚀</h1>
         <p className="text-sm text-slate-400 mt-1">
           You're on a {stats.currentStreak}-day streak. Keep it going!
@@ -164,6 +209,92 @@ export default function Dashboard() {
             </div>
           </Card>
         </div>
+      </div>
+
+      {/* Daily Challenge + Spaced Repetition */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Daily Challenge */}
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+              <CalendarCheck size={11} className="text-white" />
+            </div>
+            <h2 className="font-semibold text-slate-800 text-sm">Daily Challenge</h2>
+            <span className="ml-auto text-xs text-slate-400 flex items-center gap-1">
+              <Clock size={11} /> Resets in {countdown}
+            </span>
+          </div>
+
+          {dailyDone ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center gap-2">
+              <CheckCircle2 size={28} className="text-emerald-500" />
+              <p className="text-sm font-semibold text-slate-700">Challenge completed today!</p>
+              <p className="text-xs text-slate-400">Come back tomorrow for a new problem.</p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 mb-4">
+                <p className="text-xs text-amber-600 font-medium mb-1">Today's problem</p>
+                <h3 className="font-semibold text-slate-800 mb-2">{dailyProblem.name}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge type="difficulty">{dailyProblem.difficulty}</Badge>
+                  {dailyProblem.tags.slice(0, 2).map((t) => <Badge key={t}>{t}</Badge>)}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Link to={`/problems/${dailyProblem.id}`} className="flex-1">
+                  <Button variant="primary" size="sm" icon={<ArrowRight size={13} />} className="w-full justify-center">
+                    Solve Now
+                  </Button>
+                </Link>
+                <Button variant="secondary" size="sm" onClick={markDailyDone} className="text-xs">
+                  <CheckCircle2 size={13} /> Mark Done
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+
+        {/* Due for Review */}
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center">
+              <RefreshCw size={11} className="text-white" />
+            </div>
+            <h2 className="font-semibold text-slate-800 text-sm">Due for Review</h2>
+            {dueForReview.length > 0 && (
+              <span className="ml-auto text-xs bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded-full font-medium">
+                {dueForReview.length} due
+              </span>
+            )}
+          </div>
+
+          {dueForReview.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center gap-2">
+              <Star size={24} className="text-indigo-300" />
+              <p className="text-sm font-semibold text-slate-700">All caught up!</p>
+              <p className="text-xs text-slate-400 max-w-xs">
+                Solve problems and submit to schedule spaced-repetition reviews automatically.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {dueForReview.map((p) => (
+                <Link
+                  key={p.id}
+                  to={`/problems/${p.id}`}
+                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 group"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-700">{p.name}</p>
+                    <Badge type="difficulty">{p.difficulty}</Badge>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-400" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
 
       {/* FAANG Roadmap CTA */}

@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Play, Send, Lightbulb, Code2, MessageSquare, Sparkles, Bot, Building2 } from 'lucide-react';
+import { ArrowLeft, Play, Send, Lightbulb, Code2, MessageSquare, Sparkles, Building2, Bookmark, BookmarkCheck, StickyNote, Zap, CheckCircle2 } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import CodeEditor from '../components/ui/CodeEditor';
 import AIAssistant from '../components/ui/AIAssistant';
 import { problems } from '../data/dummy';
-import { submissionsApi } from '../services/api';
+import { submissionsApi, judge0Api } from '../services/api';
+import { bookmarksStorage, notesStorage, solvedStorage, reviewStorage } from '../utils/storage';
 
-const TABS = ['Description', 'Submissions', 'Discussion'];
+const TABS = ['Description', 'Submissions', 'Discussion', 'Notes'];
 
 function SubmissionsTab() {
   const submissions = [
@@ -61,6 +62,42 @@ function DiscussionTab() {
   );
 }
 
+function NotesTab({ problemId }) {
+  const [note, setNote] = useState(() => notesStorage.get(problemId));
+  const timerRef = useRef(null);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setNote(val);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => notesStorage.set(problemId, val), 500);
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div className="h-full flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">My Notes</h3>
+        <span className="text-xs text-slate-300">{note.length} chars · Auto-saved</span>
+      </div>
+      <textarea
+        value={note}
+        onChange={handleChange}
+        placeholder="Write your approach, key insights, complexity analysis, or anything you want to remember about this problem..."
+        className="flex-1 w-full text-sm text-slate-700 bg-slate-50 border border-slate-100 rounded-xl p-4 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 leading-relaxed"
+        style={{ minHeight: '280px' }}
+      />
+      {note.length > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span className="text-xs text-slate-400">Saved to browser storage</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProblemDetail() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('Description');
@@ -70,6 +107,8 @@ export default function ProblemDetail() {
   const [runResult, setRunResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [markedSolved, setMarkedSolved] = useState(false);
 
   const problem = problems.find((p) => p.id === Number(id));
 
@@ -77,6 +116,8 @@ export default function ProblemDetail() {
     if (problem) {
       const initial = problem.starterCodes?.[language] || problem.starterCode || '';
       setCode(initial);
+      setBookmarked(bookmarksStorage.isBookmarked(problem.id));
+      setMarkedSolved(solvedStorage.getSolvedIds().includes(problem.id));
     }
   }, [problem, language]);
 
@@ -95,13 +136,41 @@ export default function ProblemDetail() {
     );
   }
 
-  const handleRun = () => {
+  const toggleBookmark = () => {
+    bookmarksStorage.toggle(problem.id);
+    setBookmarked((v) => !v);
+  };
+
+  const markAsSolved = () => {
+    solvedStorage.markSolved(problem.id);
+    reviewStorage.schedule(problem.id, 3);
+    setMarkedSolved(true);
+  };
+
+  const handleRun = async () => {
     setIsRunning(true);
     setRunResult(null);
-    setTimeout(() => {
+    try {
+      const data = await judge0Api.run(code, language);
+      const isAccepted = data.status?.id === 3;
+      const output =
+        data.stdout?.trim() ||
+        data.stderr?.trim() ||
+        data.compile_output?.trim() ||
+        data.status?.description ||
+        'No output';
+      setRunResult({
+        success: isAccepted,
+        output,
+        runtime: data.time ? `${Math.round(data.time * 1000)}ms` : '—',
+        memory: data.memory ? `${(data.memory / 1024).toFixed(1)} MB` : '—',
+        statusDesc: data.status?.description || '',
+      });
+    } catch (err) {
+      setRunResult({ success: false, output: `Error: ${err.message}`, statusDesc: 'Error' });
+    } finally {
       setIsRunning(false);
-      setRunResult({ success: true, output: '[0, 1]', expected: '[0, 1]', runtime: '68ms' });
-    }, 1500);
+    }
   };
 
   const handleSubmit = async () => {
@@ -109,18 +178,29 @@ export default function ProblemDetail() {
     setRunResult(null);
     try {
       const data = await submissionsApi.submit(problem.id, code, language);
-      setSubmitted(data.status === 'Accepted');
+      const accepted = data.status === 'Accepted';
+      setSubmitted(accepted);
       setRunResult({
-        success: data.status === 'Accepted',
+        success: accepted,
         output: data.message,
         runtime: `${data.runtime_ms}ms`,
         memory: `${data.memory_mb} MB`,
       });
+      if (accepted && !markedSolved) {
+        markAsSolved();
+      }
     } catch (err) {
       setRunResult({ success: false, output: `Error: ${err.message}` });
     } finally {
       setIsRunning(false);
     }
+  };
+
+  const tabIcon = {
+    Description: <Code2 size={12} />,
+    Submissions: <Send size={12} />,
+    Discussion: <MessageSquare size={12} />,
+    Notes: <StickyNote size={12} />,
   };
 
   return (
@@ -135,8 +215,25 @@ export default function ProblemDetail() {
           <span className="text-xs font-medium text-slate-700 truncate max-w-xs">{problem.name}</span>
           <Badge type="difficulty">{problem.difficulty}</Badge>
           <Badge type="status">{problem.status}</Badge>
+          {markedSolved && (
+            <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+              <CheckCircle2 size={11} /> Solved
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleBookmark}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              bookmarked
+                ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-amber-200 hover:text-amber-600'
+            }`}
+            title={bookmarked ? 'Remove bookmark' : 'Bookmark this problem'}
+          >
+            {bookmarked ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
+            <span className="hidden sm:inline">{bookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+          </button>
           <Button
             variant="secondary"
             size="sm"
@@ -172,9 +269,7 @@ export default function ProblemDetail() {
                     : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
-                {tab === 'Description' && <Code2 size={12} />}
-                {tab === 'Submissions' && <Send size={12} />}
-                {tab === 'Discussion' && <MessageSquare size={12} />}
+                {tabIcon[tab]}
                 {tab}
               </button>
             ))}
@@ -231,6 +326,7 @@ export default function ProblemDetail() {
             )}
             {activeTab === 'Submissions' && <SubmissionsTab />}
             {activeTab === 'Discussion' && <DiscussionTab />}
+            {activeTab === 'Notes' && <NotesTab problemId={problem.id} />}
           </div>
         </div>
 
@@ -254,22 +350,50 @@ export default function ProblemDetail() {
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                 : 'bg-red-50 border-red-200 text-red-700'
             }`}>
-              {runResult.success ? '✓ ' : '✗ '}{runResult.output}
-              {runResult.runtime && <span className="ml-3 text-slate-400">Runtime: {runResult.runtime}</span>}
-              {runResult.memory && <span className="ml-3 text-slate-400">Memory: {runResult.memory}</span>}
+              <div className="flex items-start justify-between gap-3">
+                <span>
+                  {runResult.success ? '✓ ' : '✗ '}
+                  {runResult.statusDesc && <span className="font-semibold">{runResult.statusDesc} — </span>}
+                  {runResult.output}
+                </span>
+                <div className="flex gap-3 flex-shrink-0">
+                  {runResult.runtime && <span className="text-slate-400">Runtime: {runResult.runtime}</span>}
+                  {runResult.memory && <span className="text-slate-400">Memory: {runResult.memory}</span>}
+                </div>
+              </div>
+              {runResult.success && !markedSolved && (
+                <button
+                  onClick={markAsSolved}
+                  className="mt-2 flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-medium"
+                >
+                  <CheckCircle2 size={12} /> Mark as Solved (schedules review)
+                </button>
+              )}
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-between px-3 pb-3 pt-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<Code2 size={13} />}
-              onClick={() => setAiOpen(true)}
-            >
-              Explain Code
-            </Button>
+          <div className="flex items-center justify-between px-3 pb-3 pt-1 gap-2">
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Code2 size={13} />}
+                onClick={() => setAiOpen(true)}
+                title="AI explains your code and its complexity"
+              >
+                <span className="hidden sm:inline">Explain</span>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Zap size={13} />}
+                onClick={() => setAiOpen(true)}
+                title="Get structured AI feedback on your solution"
+              >
+                <span className="hidden sm:inline">AI Review</span>
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Button
                 variant="secondary"

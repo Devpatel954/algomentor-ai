@@ -1,12 +1,163 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, Radar
 } from 'recharts';
-import { TrendingUp, AlertTriangle, Target, Zap } from 'lucide-react';
+import { TrendingUp, AlertTriangle, Target, Zap, CalendarDays } from 'lucide-react';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import { progressData, topicPerformance, weakAreas, stats } from '../data/dummy';
+import { solvedStorage } from '../utils/storage';
+
+// Generate 365-day heatmap (deterministic mock + real localStorage data)
+function buildHeatmapData() {
+  const result = {};
+  const today = new Date();
+  let seed = 42; // deterministic seed
+  const lcg = () => { seed = (seed * 1664525 + 1013904223) & 0x7fffffff; return seed / 0x7fffffff; };
+
+  for (let i = 364; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    const r = lcg();
+    const recentBoost = i < 14 ? 0.25 : i < 30 ? 0.12 : 0;
+    result[key] = r < 0.28 + recentBoost ? Math.ceil(lcg() * 3) : 0;
+  }
+
+  // Overlay real solved dates
+  const realMap = solvedStorage.getDateMap();
+  Object.keys(realMap).forEach((date) => {
+    result[date] = (result[date] || 0) + 1;
+  });
+
+  return result;
+}
+
+// Build a 52-week grid structure (columns=weeks, rows=days Mon–Sun)
+function buildGrid(data) {
+  const weeks = [];
+  const today = new Date();
+  // Align to Sunday of the current week
+  const currentDay = today.getDay(); // 0=Sun
+  const endDate = new Date(today);
+  endDate.setDate(endDate.getDate() + (6 - currentDay));
+
+  for (let w = 51; w >= 0; w--) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(endDate);
+      date.setDate(endDate.getDate() - w * 7 - (6 - d));
+      const key = date.toISOString().split('T')[0];
+      week.push({ date: key, count: data[key] ?? null, future: date > today });
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+
+function getColor(count, future) {
+  if (future || count === null) return 'bg-slate-100';
+  if (count === 0) return 'bg-slate-100';
+  if (count <= 1) return 'bg-emerald-200';
+  if (count <= 2) return 'bg-emerald-400';
+  if (count <= 4) return 'bg-emerald-500';
+  return 'bg-emerald-600';
+}
+
+function HeatmapCalendar() {
+  const data = useMemo(() => buildHeatmapData(), []);
+  const weeks = useMemo(() => buildGrid(data), [data]);
+  const [tooltip, setTooltip] = useState(null);
+
+  // Month labels
+  const monthLabels = [];
+  weeks.forEach((week, wi) => {
+    const firstDay = week.find((d) => d.date);
+    if (firstDay) {
+      const date = new Date(firstDay.date);
+      if (date.getDate() <= 7) {
+        monthLabels.push({ wi, label: date.toLocaleString('default', { month: 'short' }) });
+      }
+    }
+  });
+
+  const totalSolved = Object.values(data).reduce((s, c) => s + c, 0);
+  const activeDays = Object.values(data).filter((c) => c > 0).length;
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <CalendarDays size={15} className="text-emerald-500" />
+          <h2 className="text-sm font-semibold text-slate-800">Activity Heatmap</h2>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-slate-400">
+          <span>{totalSolved} solves this year</span>
+          <span>{activeDays} active days</span>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto pb-2">
+        <div className="min-w-max">
+          {/* Month labels */}
+          <div className="flex mb-1 ml-8">
+            {weeks.map((_, wi) => {
+              const label = monthLabels.find((m) => m.wi === wi);
+              return (
+                <div key={wi} className="w-3.5 mr-0.5 text-[10px] text-slate-400" style={{ flexShrink: 0 }}>
+                  {label ? label.label : ''}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Grid */}
+          <div className="flex gap-0.5">
+            {/* Day labels */}
+            <div className="flex flex-col gap-0.5 mr-1 text-[10px] text-slate-400 leading-none">
+              {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((d, i) => (
+                <div key={i} className="h-3.5 flex items-center">{d}</div>
+              ))}
+            </div>
+
+            {/* Weeks */}
+            {weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-0.5">
+                {week.map(({ date, count, future }) => (
+                  <div
+                    key={date}
+                    className={`w-3.5 h-3.5 rounded-sm ${getColor(count, future)} cursor-pointer transition-opacity hover:opacity-80 relative`}
+                    onMouseEnter={() => date && !future && setTooltip({ date, count: count ?? 0 })}
+                    onMouseLeave={() => setTooltip(null)}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-1 mt-2 ml-8">
+            <span className="text-[10px] text-slate-400 mr-1">Less</span>
+            {['bg-slate-100', 'bg-emerald-200', 'bg-emerald-400', 'bg-emerald-500', 'bg-emerald-600'].map((c) => (
+              <div key={c} className={`w-3.5 h-3.5 rounded-sm ${c}`} />
+            ))}
+            <span className="text-[10px] text-slate-400 ml-1">More</span>
+          </div>
+        </div>
+      </div>
+
+      {tooltip && (
+        <div className="mt-2 text-xs text-center">
+          <span className="inline-flex items-center gap-1.5 bg-slate-800 text-slate-100 px-3 py-1.5 rounded-lg">
+            <span className="font-semibold">{tooltip.count}</span> problem{tooltip.count !== 1 ? 's' : ''} solved
+            <span className="text-slate-400">·</span>
+            {new Date(tooltip.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </span>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 function CustomTooltip({ active, payload, label }) {
   if (active && payload && payload.length) {
@@ -171,6 +322,11 @@ export default function Progress() {
             </p>
           </div>
         </Card>
+      </div>
+
+      {/* Activity Heatmap */}
+      <div className="mt-6">
+        <HeatmapCalendar />
       </div>
     </div>
   );

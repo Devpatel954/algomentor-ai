@@ -1,17 +1,18 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, TrendingUp, Zap, Menu, X, Trophy } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, BookOpen, TrendingUp, Zap, Menu, X, Trophy, Lightbulb, Timer } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/problems', label: 'Problems', icon: BookOpen },
   { to: '/progress', label: 'Progress', icon: TrendingUp },
+  { to: '/patterns', label: 'Patterns', icon: Lightbulb },
+  { to: '/simulator', label: 'Simulator', icon: Timer },
   { to: '/roadmap', label: 'Roadmap', icon: Trophy },
 ];
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
 
   return (
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100">
@@ -28,21 +29,21 @@ export default function Navbar() {
           </NavLink>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-0.5">
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                  `flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all ${
                     isActive
                       ? 'bg-indigo-50 text-indigo-600'
                       : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                   }`
                 }
               >
-                <Icon size={15} />
+                <Icon size={14} />
                 {label}
               </NavLink>
             ))}
@@ -71,7 +72,7 @@ export default function Navbar() {
 
       {/* Mobile Menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-1">
+        <div className="md:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-1 animate-fade-in">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}

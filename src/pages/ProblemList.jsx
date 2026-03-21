@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Filter, ChevronRight, X } from 'lucide-react';
+import { Search, ChevronRight, X, Bookmark, BookmarkCheck } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import { SkeletonRow } from '../components/ui/Skeleton';
 import { problems } from '../data/dummy';
+import { bookmarksStorage } from '../utils/storage';
 
 const allTags = [...new Set(problems.flatMap((p) => p.tags))].sort();
 const difficulties = ['Easy', 'Medium', 'Hard'];
@@ -15,6 +16,8 @@ export default function ProblemList() {
   const [search, setSearch] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [selectedTags, setSelectedTags] = useState([]);
+  const [showBookmarked, setShowBookmarked] = useState(false);
+  const [bookmarks, setBookmarks] = useState(() => bookmarksStorage.get());
   const [loading] = useState(false);
 
   const filtered = useMemo(() => {
@@ -22,9 +25,10 @@ export default function ProblemList() {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
       const matchDiff = selectedDifficulty === 'All' || p.difficulty === selectedDifficulty;
       const matchTags = selectedTags.length === 0 || selectedTags.every((t) => p.tags.includes(t));
-      return matchSearch && matchDiff && matchTags;
+      const matchBookmarked = !showBookmarked || bookmarks.includes(p.id);
+      return matchSearch && matchDiff && matchTags && matchBookmarked;
     });
-  }, [search, selectedDifficulty, selectedTags]);
+  }, [search, selectedDifficulty, selectedTags, showBookmarked, bookmarks]);
 
   const toggleTag = (tag) => {
     setSelectedTags((prev) =>
@@ -32,13 +36,21 @@ export default function ProblemList() {
     );
   };
 
+  const toggleBookmark = (e, problemId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const updated = bookmarksStorage.toggle(problemId);
+    setBookmarks(updated);
+  };
+
   const clearFilters = () => {
     setSearch('');
     setSelectedDifficulty('All');
     setSelectedTags([]);
+    setShowBookmarked(false);
   };
 
-  const hasFilters = search || selectedDifficulty !== 'All' || selectedTags.length > 0;
+  const hasFilters = search || selectedDifficulty !== 'All' || selectedTags.length > 0 || showBookmarked;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -69,9 +81,9 @@ export default function ProblemList() {
           </div>
 
           {/* Difficulty filter */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
-              variant={selectedDifficulty === 'All' ? 'primary' : 'secondary'}
+              variant={selectedDifficulty === 'All' && !showBookmarked ? 'primary' : 'secondary'}
               size="sm"
               onClick={() => setSelectedDifficulty('All')}
             >
@@ -87,6 +99,17 @@ export default function ProblemList() {
                 {d}
               </Button>
             ))}
+            <button
+              onClick={() => setShowBookmarked((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                showBookmarked
+                  ? 'bg-amber-50 text-amber-700 border-amber-300'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-amber-200 hover:text-amber-600'
+              }`}
+            >
+              {showBookmarked ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
+              Bookmarked {bookmarks.length > 0 && `(${bookmarks.length})`}
+            </button>
           </div>
 
           {hasFilters && (
@@ -121,7 +144,8 @@ export default function ProblemList() {
           <div className="col-span-5">Problem</div>
           <div className="col-span-2">Difficulty</div>
           <div className="col-span-3">Tags</div>
-          <div className="col-span-2">Status</div>
+          <div className="col-span-1">Status</div>
+          <div className="col-span-1 text-right">Save</div>
         </div>
 
         {loading ? (
@@ -162,8 +186,23 @@ export default function ProblemList() {
                   <span className="text-xs text-slate-400">+{problem.tags.length - 2}</span>
                 )}
               </div>
-              <div className="col-span-2">
+              <div className="col-span-1">
                 <Badge type="status">{problem.status}</Badge>
+              </div>
+              <div className="col-span-1 flex justify-end">
+                <button
+                  onClick={(e) => toggleBookmark(e, problem.id)}
+                  className={`p-1.5 rounded-md transition-all ${
+                    bookmarks.includes(problem.id)
+                      ? 'text-amber-500 hover:bg-amber-50'
+                      : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50'
+                  }`}
+                  title={bookmarks.includes(problem.id) ? 'Remove bookmark' : 'Bookmark'}
+                >
+                  {bookmarks.includes(problem.id)
+                    ? <BookmarkCheck size={14} />
+                    : <Bookmark size={14} />}
+                </button>
               </div>
             </Link>
           ))
