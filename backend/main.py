@@ -1,7 +1,7 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import problem, submission, ai
+from routers import problem, submission, ai, run
 from config import settings
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
@@ -38,6 +38,7 @@ app.add_middleware(
 app.include_router(problem.router)
 app.include_router(submission.router)
 app.include_router(ai.router)
+app.include_router(run.router)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────

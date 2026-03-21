@@ -49,85 +49,54 @@ export const submissionsApi = {
   mySubmissions: () => request('/submissions/me'),
 };
 
-// ─── Wandbox (free, no API key, CORS-enabled) ────────────────────────────────
-// https://wandbox.org — no signup, no limits for reasonable use
-const WANDBOX_URL = 'https://wandbox.org/api';
+// ─── Codapi (free public instance, no API key, all major languages) ──────────
+// https://codapi.org — sandboxed execution, no signup required
+const CODAPI_URL = 'https://codapi.org/api/v1/exec';
 
-// Map app language IDs → Wandbox language names (as returned by /api/list.json)
-const WANDBOX_LANG = {
-  javascript: 'JavaScript',
-  python:     'Python',
-  java:       'Java',
-  cpp:        'C++',
-  typescript: 'TypeScript',
-  go:         'Go',
+// Map app language IDs → Codapi sandbox names
+const CODAPI_SANDBOX = {
+  javascript: 'javascript',
+  python:     'python',
+  java:       'java',
+  cpp:        'cpp',
+  go:         'go',
+  typescript: 'javascript', // Codapi has no TS sandbox; run as JS
 };
-
-// Hardcoded fallbacks in case the list endpoint is unavailable
-const WANDBOX_FALLBACK = {
-  javascript: 'nodejs-head',
-  python:     'cpython-head',
-  java:       'openjdk-head',
-  cpp:        'gcc-head',
-  typescript: 'typescript-head',
-  go:         'go-head',
-};
-
-let _wandboxList = null;
-const _compilerCache = {};
-
-async function resolveCompiler(appLang) {
-  if (_compilerCache[appLang]) return _compilerCache[appLang];
-  try {
-    if (!_wandboxList) {
-      const r = await fetch(`${WANDBOX_URL}/list.json`);
-      if (!r.ok) throw new Error('list failed');
-      _wandboxList = await r.json();
-    }
-    const wbLang  = WANDBOX_LANG[appLang];
-    const matches = _wandboxList.filter((c) => c.language === wbLang);
-    if (!matches.length) throw new Error('no match');
-    // Prefer a rolling "head" build (always latest), else first entry
-    const chosen = matches.find((c) => c.name.includes('-head')) || matches[0];
-    _compilerCache[appLang] = chosen.name;
-    return chosen.name;
-  } catch {
-    return WANDBOX_FALLBACK[appLang] || 'gcc-head';
-  }
-}
 
 export const judge0Api = {
   run: async (code, language = 'javascript', stdin = '') => {
-    const compiler = await resolveCompiler(language);
+    const sandbox = CODAPI_SANDBOX[language] || 'python';
 
-    const res = await fetch(`${WANDBOX_URL}/compile.json`, {
+    const res = await fetch(CODAPI_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ code, compiler, stdin }),
+      body:    JSON.stringify({
+        sandbox,
+        command: 'run',
+        files:   { '': code },
+      }),
     });
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `Wandbox error: ${res.status}`);
+      throw new Error(body.message || `Codapi error: ${res.status}`);
     }
 
-    const data       = await res.json();
-    const compileErr = data.compiler_error || null;
-    const isSuccess  = data.status === '0' && !compileErr;
+    const data      = await res.json();
+    // data.ok === false means compile/runtime error
+    const isSuccess = data.ok === true && !data.stderr;
 
     return {
-      stdout:         data.program_output || null,
-      stderr:         data.program_error  || null,
-      compile_output: compileErr,
+      stdout:         data.stdout  || null,
+      stderr:         data.stderr  || null,
+      compile_output: data.ok === false && data.stderr ? data.stderr : null,
       status: {
         id:          isSuccess ? 3 : 11,
         description: isSuccess
           ? 'Accepted'
-          : compileErr
-            ? 'Compilation Error'
-            : data.signal
-              ? `Killed: ${data.signal}`
-              : 'Runtime Error',
+          : data.stderr
+            ? 'Error'
+            : 'Runtime Error',
       },
       time:   null,
       memory: null,
