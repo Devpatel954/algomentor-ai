@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, Target, Flame, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
+import { ArrowRight, Sparkles, Target, Flame, CheckCircle2, Clock, ChevronRight, Trophy } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -163,6 +163,28 @@ export default function Dashboard() {
               </Link>
             </div>
           </Card>
+        </div>
+      </div>
+
+      {/* FAANG Roadmap CTA */}
+      <div className="mt-6">
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-violet-950 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-yellow-400/20 border border-yellow-400/30 flex items-center justify-center flex-shrink-0">
+              <Trophy size={20} className="text-yellow-400" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-base">FAANG Interview Roadmap</h3>
+              <p className="text-slate-400 text-sm mt-0.5">
+                Follow a structured path to crack Google, Meta, Amazon, Apple & Netflix. Track your progress phase by phase.
+              </p>
+            </div>
+          </div>
+          <Link to="/roadmap" className="flex-shrink-0">
+            <Button variant="primary" size="sm" icon={<ArrowRight size={14} />} className="whitespace-nowrap">
+              View Roadmap
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

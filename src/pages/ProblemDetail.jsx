@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Play, Send, Lightbulb, Code2, MessageSquare, Sparkles, Bot } from 'lucide-react';
+import { ArrowLeft, Play, Send, Lightbulb, Code2, MessageSquare, Sparkles, Bot, Building2 } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import CodeEditor from '../components/ui/CodeEditor';
@@ -64,6 +64,7 @@ function DiscussionTab() {
 export default function ProblemDetail() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('Description');
+  const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState('');
   const [aiOpen, setAiOpen] = useState(false);
   const [runResult, setRunResult] = useState(null);
@@ -73,8 +74,17 @@ export default function ProblemDetail() {
   const problem = problems.find((p) => p.id === Number(id));
 
   useEffect(() => {
-    if (problem) setCode(problem.starterCode);
-  }, [problem]);
+    if (problem) {
+      const initial = problem.starterCodes?.[language] || problem.starterCode || '';
+      setCode(initial);
+    }
+  }, [problem, language]);
+
+  const handleLanguageChange = (langId, starterCode) => {
+    setLanguage(langId);
+    setCode(starterCode || problem?.starterCodes?.[langId] || '');
+    setRunResult(null);
+  };
 
   if (!problem) {
     return (
@@ -98,7 +108,7 @@ export default function ProblemDetail() {
     setIsRunning(true);
     setRunResult(null);
     try {
-      const data = await submissionsApi.submit(problem.id, code, 'javascript');
+      const data = await submissionsApi.submit(problem.id, code, language);
       setSubmitted(data.status === 'Accepted');
       setRunResult({
         success: data.status === 'Accepted',
@@ -178,6 +188,21 @@ export default function ProblemDetail() {
                 <div className="flex flex-wrap gap-2 mb-4">
                   {problem.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}
                 </div>
+
+                {/* Companies */}
+                {problem.company && problem.company.length > 0 && (
+                  <div className="flex items-center gap-2 mb-4 flex-wrap">
+                    <span className="flex items-center gap-1 text-xs text-slate-400 font-medium">
+                      <Building2 size={11} /> Asked at:
+                    </span>
+                    {problem.company.map((c) => (
+                      <span key={c} className="px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 <p className="text-sm text-slate-600 leading-relaxed mb-5 whitespace-pre-line">
                   {problem.description}
                 </p>
@@ -213,7 +238,13 @@ export default function ProblemDetail() {
         <div className="hidden lg:flex flex-col flex-1 overflow-hidden bg-slate-50">
           {/* Code Editor */}
           <div className="flex-1 p-3 overflow-hidden">
-            <CodeEditor value={code} onChange={setCode} />
+            <CodeEditor
+              value={code}
+              onChange={setCode}
+              language={language}
+              onLanguageChange={handleLanguageChange}
+              starterCodes={problem.starterCodes || {}}
+            />
           </div>
 
           {/* Run Result */}

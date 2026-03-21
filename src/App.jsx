@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import ProblemList from './pages/ProblemList';
 import ProblemDetail from './pages/ProblemDetail';
 import Progress from './pages/Progress';
+import Roadmap from './pages/Roadmap';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
             <Route path="/problems" element={<ProblemList />} />
             <Route path="/problems/:id" element={<ProblemDetail />} />
             <Route path="/progress" element={<Progress />} />
+            <Route path="/roadmap" element={<Roadmap />} />
           </Routes>
         </main>
       </div>

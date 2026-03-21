@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, TrendingUp, Zap, Menu, X } from 'lucide-react';
+import { LayoutDashboard, BookOpen, TrendingUp, Zap, Menu, X, Trophy } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/problems', label: 'Problems', icon: BookOpen },
   { to: '/progress', label: 'Progress', icon: TrendingUp },
+  { to: '/roadmap', label: 'Roadmap', icon: Trophy },
 ];
 
 export default function Navbar() {
