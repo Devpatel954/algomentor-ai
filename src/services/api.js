@@ -49,49 +49,60 @@ export const submissionsApi = {
   mySubmissions: () => request('/submissions/me'),
 };
 
-// ─── Judge0 (real code execution) ────────────────────────────────────────────
-// Add VITE_JUDGE0_API_KEY to .env (free tier at rapidapi.com/judge0-official/api/judge0-ce)
-// Without a key, Run falls back to a simulated response.
+// ─── Piston (free, no API key, 70+ languages) ────────────────────────────────
+// https://github.com/engineer-man/piston — completely free, no rate-limit for reasonable use
 export const judge0Api = {
-  LANG_IDS: {
-    javascript: 63,  // Node.js 12.14.0
-    python: 71,      // Python 3.8.1
-    java: 62,        // OpenJDK 13
-    cpp: 54,         // GCC 9.2.0
-    typescript: 74,  // TypeScript 3.7.4
-    go: 60,          // Go 1.13.5
+  // Piston language names (version "*" = latest available)
+  LANG_NAMES: {
+    javascript: 'javascript',
+    python:     'python',
+    java:       'java',
+    cpp:        'c++',
+    typescript: 'typescript',
+    go:         'go',
   },
 
   run: async (code, language = 'javascript', stdin = '') => {
-    const apiKey = import.meta.env.VITE_JUDGE0_API_KEY;
+    const langName = judge0Api.LANG_NAMES[language] || 'javascript';
 
-    if (!apiKey) {
-      // Graceful mock when no key configured
-      await new Promise((r) => setTimeout(r, 1400));
-      return {
-        stdout: '// ⚠️ No Judge0 API key set.\n// Add VITE_JUDGE0_API_KEY=your_key to .env\n// Get a free key at rapidapi.com/judge0-official/api/judge0-ce\n// Your code runs locally — add console.log() to see output.',
-        stderr: null,
-        status: { id: 3, description: 'Simulated Run' },
-        time: '0.05',
-        memory: 3200,
-      };
-    }
+    const res = await fetch('https://emkc.org/api/v2/piston/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: langName,
+        version: '*',
+        files: [{ content: code }],
+        stdin,
+      }),
+    });
 
-    const langId = judge0Api.LANG_IDS[language] || 63;
-    const res = await fetch(
-      'https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-RapidAPI-Key': apiKey,
-          'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
-        },
-        body: JSON.stringify({ source_code: code, language_id: langId, stdin }),
-      }
-    );
-    if (!res.ok) throw new Error(`Judge0 error: ${res.status}`);
-    return res.json();
+    if (!res.ok) throw new Error(`Piston error: ${res.status}`);
+    const data = await res.json();
+
+    const run = data.run || {};
+    const compileErr = data.compile?.stderr || data.compile?.output || null;
+
+    // Did execution succeed? (exit code 0 and no stderr)
+    const isSuccess = run.code === 0 && !run.stderr;
+
+    // Normalize to the same shape the rest of the app expects (Judge0-compatible)
+    return {
+      stdout:          run.stdout || null,
+      stderr:          run.stderr || null,
+      compile_output:  compileErr,
+      status: {
+        id:          isSuccess ? 3 : 11,
+        description: isSuccess
+          ? 'Accepted'
+          : compileErr
+            ? 'Compilation Error'
+            : run.signal
+              ? `Killed: ${run.signal}`
+              : 'Runtime Error',
+      },
+      time:   null,  // Piston doesn't expose timing
+      memory: null,
+    };
   },
 };
 
