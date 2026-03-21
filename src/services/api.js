@@ -49,58 +49,49 @@ export const submissionsApi = {
   mySubmissions: () => request('/submissions/me'),
 };
 
-// ─── Codapi (free public instance, no API key, all major languages) ──────────
-// https://codapi.org — sandboxed execution, no signup required
-const CODAPI_URL = 'https://codapi.org/api/v1/exec';
-
-// Map app language IDs → Codapi sandbox names
-const CODAPI_SANDBOX = {
-  javascript: 'javascript',
-  python:     'python',
-  java:       'java',
-  cpp:        'cpp',
-  go:         'go',
-  typescript: 'javascript', // Codapi has no TS sandbox; run as JS
-};
-
+// ─── Judge0 (real code execution via RapidAPI free tier) ─────────────────────
+// Get a free key at: https://rapidapi.com/judge0-official/api/judge0-ce
+// Add it to .env as: VITE_JUDGE0_API_KEY=your_key_here
 export const judge0Api = {
+  LANG_IDS: {
+    javascript: 63,  // Node.js 12.14.0
+    python:     71,  // Python 3.8.1
+    java:       62,  // OpenJDK 13
+    cpp:        54,  // GCC 9.2.0
+    typescript: 74,  // TypeScript 3.7.4
+    go:         60,  // Go 1.13.5
+  },
+
   run: async (code, language = 'javascript', stdin = '') => {
-    const sandbox = CODAPI_SANDBOX[language] || 'python';
+    const apiKey = import.meta.env.VITE_JUDGE0_API_KEY;
 
-    const res = await fetch(CODAPI_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        sandbox,
-        command: 'run',
-        files:   { '': code },
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.message || `Codapi error: ${res.status}`);
+    if (!apiKey) {
+      await new Promise((r) => setTimeout(r, 800));
+      return {
+        stdout: '// No Judge0 API key configured.\n// Add VITE_JUDGE0_API_KEY=your_key to .env\n// Free key: rapidapi.com/judge0-official/api/judge0-ce',
+        stderr: null,
+        compile_output: null,
+        status: { id: 3, description: 'Simulated Run (no key)' },
+        time: '0.05',
+        memory: 3200,
+      };
     }
 
-    const data      = await res.json();
-    // data.ok === false means compile/runtime error
-    const isSuccess = data.ok === true && !data.stderr;
-
-    return {
-      stdout:         data.stdout  || null,
-      stderr:         data.stderr  || null,
-      compile_output: data.ok === false && data.stderr ? data.stderr : null,
-      status: {
-        id:          isSuccess ? 3 : 11,
-        description: isSuccess
-          ? 'Accepted'
-          : data.stderr
-            ? 'Error'
-            : 'Runtime Error',
-      },
-      time:   null,
-      memory: null,
-    };
+    const langId = judge0Api.LANG_IDS[language] || 63;
+    const res = await fetch(
+      'https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RapidAPI-Key': apiKey,
+          'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
+        },
+        body: JSON.stringify({ source_code: code, language_id: langId, stdin }),
+      }
+    );
+    if (!res.ok) throw new Error(`Judge0 error: ${res.status}`);
+    return res.json();
   },
 };
 

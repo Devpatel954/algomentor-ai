@@ -153,6 +153,7 @@ export default function ProblemDetail() {
     setRunResult(null);
     try {
       const data = await judge0Api.run(code, language);
+      const notAvailable = data.status?.id === 0;
       const isAccepted = data.status?.id === 3;
       const output =
         data.stdout?.trim() ||
@@ -162,9 +163,10 @@ export default function ProblemDetail() {
         'No output';
       setRunResult({
         success: isAccepted,
+        unavailable: notAvailable,
         output,
-        runtime: data.time ? `${Math.round(data.time * 1000)}ms` : '—',
-        memory: data.memory ? `${(data.memory / 1024).toFixed(1)} MB` : '—',
+        runtime: data.time ? `${Math.round(data.time * 1000)}ms` : null,
+        memory: data.memory ? `${(data.memory / 1024).toFixed(1)} MB` : null,
         statusDesc: data.status?.description || '',
       });
     } catch (err) {
@@ -375,15 +377,18 @@ export default function ProblemDetail() {
           {/* Run Result */}
           {runResult && (
             <div className={`mx-3 mb-2 p-3 rounded-xl text-xs font-mono border ${
-              runResult.success
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                : 'bg-red-50 border-red-200 text-red-700'
+              runResult.unavailable
+                ? 'bg-slate-50 border-slate-200 text-slate-500'
+                : runResult.success
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
             }`}>
               <div className="flex items-start justify-between gap-3">
                 <span>
-                  {runResult.success ? '✓ ' : '✗ '}
-                  {runResult.statusDesc && <span className="font-semibold">{runResult.statusDesc} — </span>}
-                  {runResult.output}
+                  {runResult.unavailable ? '⚠ ' : runResult.success ? '✓ ' : '✗ '}
+                  {runResult.statusDesc && <span className="font-semibold">{runResult.statusDesc}{runResult.unavailable ? '' : ' — '}</span>}
+                  {!runResult.unavailable && runResult.output}
+                  {runResult.unavailable && <span className="font-normal ml-1">Switch to JavaScript or Python to run code.</span>}
                 </span>
                 <div className="flex gap-3 flex-shrink-0">
                   {runResult.runtime && <span className="text-slate-400">Runtime: {runResult.runtime}</span>}
