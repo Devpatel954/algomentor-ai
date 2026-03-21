@@ -50,46 +50,76 @@ export const submissionsApi = {
 };
 
 // ─── Piston (free, no API key, 70+ languages) ────────────────────────────────
-// https://github.com/engineer-man/piston — completely free, no rate-limit for reasonable use
+// https://github.com/engineer-man/piston — completely free, no key required
+const PISTON_URL = 'https://emkc.org/api/v2/piston';
+
+// Map our language IDs → Piston language names
+const PISTON_LANG = {
+  javascript: 'javascript',
+  python:     'python',
+  java:       'java',
+  cpp:        'c++',
+  typescript: 'typescript',
+  go:         'go',
+};
+
+// Cache runtimes so we only fetch once per session
+let _pistonRuntimes = null;
+async function getPistonRuntimes() {
+  if (_pistonRuntimes) return _pistonRuntimes;
+  const res = await fetch(`${PISTON_URL}/runtimes`);
+  if (!res.ok) throw new Error('Could not fetch Piston runtimes');
+  _pistonRuntimes = await res.json();
+  return _pistonRuntimes;
+}
+
+// Find the latest version for a given language name
+async function resolveVersion(langName) {
+  try {
+    const runtimes = await getPistonRuntimes();
+    const matches = runtimes.filter(
+      (r) => r.language === langName || r.aliases?.includes(langName)
+    );
+    if (!matches.length) return '*';
+    // Pick highest version (simple string sort is fine for semver here)
+    return matches.sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }))[0].version;
+  } catch {
+    return '*';
+  }
+}
+
 export const judge0Api = {
-  // Piston language names (version "*" = latest available)
-  LANG_NAMES: {
-    javascript: 'javascript',
-    python:     'python',
-    java:       'java',
-    cpp:        'c++',
-    typescript: 'typescript',
-    go:         'go',
-  },
+  LANG_NAMES: PISTON_LANG,
 
   run: async (code, language = 'javascript', stdin = '') => {
-    const langName = judge0Api.LANG_NAMES[language] || 'javascript';
+    const langName = PISTON_LANG[language] || 'javascript';
+    const version  = await resolveVersion(langName);
 
-    const res = await fetch('https://emkc.org/api/v2/piston/execute', {
+    const res = await fetch(`${PISTON_URL}/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         language: langName,
-        version: '*',
-        files: [{ content: code }],
+        version,
+        files: [{ name: `main`, content: code }],
         stdin,
       }),
     });
 
-    if (!res.ok) throw new Error(`Piston error: ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Piston error: ${res.status}`);
+    }
+
     const data = await res.json();
-
-    const run = data.run || {};
+    const run        = data.run        || {};
     const compileErr = data.compile?.stderr || data.compile?.output || null;
+    const isSuccess  = run.code === 0 && !run.stderr;
 
-    // Did execution succeed? (exit code 0 and no stderr)
-    const isSuccess = run.code === 0 && !run.stderr;
-
-    // Normalize to the same shape the rest of the app expects (Judge0-compatible)
     return {
-      stdout:          run.stdout || null,
-      stderr:          run.stderr || null,
-      compile_output:  compileErr,
+      stdout:         run.stdout  || null,
+      stderr:         run.stderr  || null,
+      compile_output: compileErr,
       status: {
         id:          isSuccess ? 3 : 11,
         description: isSuccess
@@ -100,7 +130,7 @@ export const judge0Api = {
               ? `Killed: ${run.signal}`
               : 'Runtime Error',
       },
-      time:   null,  // Piston doesn't expose timing
+      time:   null,
       memory: null,
     };
   },
