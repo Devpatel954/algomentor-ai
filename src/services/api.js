@@ -49,76 +49,75 @@ export const submissionsApi = {
   mySubmissions: () => request('/submissions/me'),
 };
 
-// ─── Piston (free, no API key, 70+ languages) ────────────────────────────────
-// https://github.com/engineer-man/piston — completely free, no key required
-const PISTON_URL = 'https://emkc.org/api/v2/piston';
+// ─── Wandbox (free, no API key, CORS-enabled) ────────────────────────────────
+// https://wandbox.org — no signup, no limits for reasonable use
+const WANDBOX_URL = 'https://wandbox.org/api';
 
-// Map our language IDs → Piston language names
-const PISTON_LANG = {
-  javascript: 'javascript',
-  python:     'python',
-  java:       'java',
-  cpp:        'c++',
-  typescript: 'typescript',
-  go:         'go',
+// Map app language IDs → Wandbox language names (as returned by /api/list.json)
+const WANDBOX_LANG = {
+  javascript: 'JavaScript',
+  python:     'Python',
+  java:       'Java',
+  cpp:        'C++',
+  typescript: 'TypeScript',
+  go:         'Go',
 };
 
-// Cache runtimes so we only fetch once per session
-let _pistonRuntimes = null;
-async function getPistonRuntimes() {
-  if (_pistonRuntimes) return _pistonRuntimes;
-  const res = await fetch(`${PISTON_URL}/runtimes`);
-  if (!res.ok) throw new Error('Could not fetch Piston runtimes');
-  _pistonRuntimes = await res.json();
-  return _pistonRuntimes;
-}
+// Hardcoded fallbacks in case the list endpoint is unavailable
+const WANDBOX_FALLBACK = {
+  javascript: 'nodejs-head',
+  python:     'cpython-head',
+  java:       'openjdk-head',
+  cpp:        'gcc-head',
+  typescript: 'typescript-head',
+  go:         'go-head',
+};
 
-// Find the latest version for a given language name
-async function resolveVersion(langName) {
+let _wandboxList = null;
+const _compilerCache = {};
+
+async function resolveCompiler(appLang) {
+  if (_compilerCache[appLang]) return _compilerCache[appLang];
   try {
-    const runtimes = await getPistonRuntimes();
-    const matches = runtimes.filter(
-      (r) => r.language === langName || r.aliases?.includes(langName)
-    );
-    if (!matches.length) return '*';
-    // Pick highest version (simple string sort is fine for semver here)
-    return matches.sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }))[0].version;
+    if (!_wandboxList) {
+      const r = await fetch(`${WANDBOX_URL}/list.json`);
+      if (!r.ok) throw new Error('list failed');
+      _wandboxList = await r.json();
+    }
+    const wbLang  = WANDBOX_LANG[appLang];
+    const matches = _wandboxList.filter((c) => c.language === wbLang);
+    if (!matches.length) throw new Error('no match');
+    // Prefer a rolling "head" build (always latest), else first entry
+    const chosen = matches.find((c) => c.name.includes('-head')) || matches[0];
+    _compilerCache[appLang] = chosen.name;
+    return chosen.name;
   } catch {
-    return '*';
+    return WANDBOX_FALLBACK[appLang] || 'gcc-head';
   }
 }
 
 export const judge0Api = {
-  LANG_NAMES: PISTON_LANG,
-
   run: async (code, language = 'javascript', stdin = '') => {
-    const langName = PISTON_LANG[language] || 'javascript';
-    const version  = await resolveVersion(langName);
+    const compiler = await resolveCompiler(language);
 
-    const res = await fetch(`${PISTON_URL}/execute`, {
-      method: 'POST',
+    const res = await fetch(`${WANDBOX_URL}/compile.json`, {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        language: langName,
-        version,
-        files: [{ name: `main`, content: code }],
-        stdin,
-      }),
+      body:    JSON.stringify({ code, compiler, stdin }),
     });
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.message || `Piston error: ${res.status}`);
+      throw new Error(body.error || `Wandbox error: ${res.status}`);
     }
 
-    const data = await res.json();
-    const run        = data.run        || {};
-    const compileErr = data.compile?.stderr || data.compile?.output || null;
-    const isSuccess  = run.code === 0 && !run.stderr;
+    const data       = await res.json();
+    const compileErr = data.compiler_error || null;
+    const isSuccess  = data.status === '0' && !compileErr;
 
     return {
-      stdout:         run.stdout  || null,
-      stderr:         run.stderr  || null,
+      stdout:         data.program_output || null,
+      stderr:         data.program_error  || null,
       compile_output: compileErr,
       status: {
         id:          isSuccess ? 3 : 11,
@@ -126,8 +125,8 @@ export const judge0Api = {
           ? 'Accepted'
           : compileErr
             ? 'Compilation Error'
-            : run.signal
-              ? `Killed: ${run.signal}`
+            : data.signal
+              ? `Killed: ${data.signal}`
               : 'Runtime Error',
       },
       time:   null,
